@@ -2,14 +2,64 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Alternative Shopping POC</title>
-  <!-- Link to compiled tailwind output -->
   <link href="dist/output.css" rel="stylesheet" />
+  <style>
+    /* Backup CSS if Tailwind classes do not apply properly */
+    .image-container {
+      width: 256px; /* Fixed width */
+      height: 256px; /* Fixed height */
+      overflow: hidden; /* Prevent content overflow */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 8px; /* Rounded corners */
+      border: 1px solid #ccc; /* Light border */
+      margin: 20px;
+    }
+    .image-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover; /* Maintains aspect ratio and fills the box */
+    }
+  </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen">
-  <div class="bg-white shadow-md rounded-lg max-w-lg w-full p-6 space-y-6">
+  <div class="bg-white shadow-md rounded-lg max-w-3xl w-full p-6 space-y-6">
     <h1 class="text-2xl font-bold text-gray-800 text-center">Find Products (No Amazon)</h1>
+    
+    <!-- Images Section: using containers -->
+    <div class="flex justify-center items-start gap-x-8">
+      <figure class="flex flex-col items-center">
+        <div class="image-container">
+          <img 
+            src="images/jeffBabe.png" 
+            alt="Image 1 description"
+          />
+        </div>
+      </figure>
+      <figure class="flex flex-col items-center">
+        <div class="image-container">
+          <img 
+            src="images/jeffYacht.png" 
+            alt="Image 2 description"
+          />
+        </div>
+      </figure>
+      <figure class="flex flex-col items-center">
+        <div class="image-container">
+          <img 
+            src="images/jeffRealEstate.png" 
+            alt="Image 2 description"
+          />
+        </div>
+        
+
+      </figure>
+    </div>
+    
+    <!-- Search Form -->
     <form id="searchForm" class="flex space-x-2">
       <input 
         type="text" 
