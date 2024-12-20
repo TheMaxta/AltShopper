@@ -2,63 +2,51 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Alternative Shopping POC</title>
   <link href="dist/output.css" rel="stylesheet" />
   <style>
-    /* Backup CSS if Tailwind classes do not apply properly */
     .image-container {
-      width: 256px; /* Fixed width */
-      height: 256px; /* Fixed height */
-      overflow: hidden; /* Prevent content overflow */
+      width: 256px;
+      height: 256px;
+      overflow: hidden;
       display: flex;
       justify-content: center;
       align-items: center;
-      border-radius: 8px; /* Rounded corners */
-      border: 1px solid #ccc; /* Light border */
+      border-radius: 8px;
+      border: 1px solid #ccc;
       margin: 20px;
     }
     .image-container img {
       width: 100%;
       height: 100%;
-      object-fit: cover; /* Maintains aspect ratio and fills the box */
+      object-fit: cover;
     }
   </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen">
   <div class="bg-white shadow-md rounded-lg max-w-3xl w-full p-6 space-y-6">
     <h1 class="text-2xl font-bold text-gray-800 text-center">Find Products (No Amazon)</h1>
-    
-    <!-- Images Section: using containers -->
+
+    <!-- Images Section -->
     <div class="flex justify-center items-start gap-x-8">
       <figure class="flex flex-col items-center">
         <div class="image-container">
-          <img 
-            src="images/jeffBabe.png" 
-            alt="Image 1 description"
-          />
+          <img src="images/jeffBabe.png" alt="Image 1 description" />
         </div>
       </figure>
       <figure class="flex flex-col items-center">
         <div class="image-container">
-          <img 
-            src="images/jeffYacht.png" 
-            alt="Image 2 description"
-          />
+          <img src="images/jeffYacht.png" alt="Image 2 description" />
         </div>
       </figure>
       <figure class="flex flex-col items-center">
         <div class="image-container">
-          <img 
-            src="images/jeffRealEstate.png" 
-            alt="Image 2 description"
-          />
+          <img src="images/jeffRealEstate.png" alt="Image 3 description" />
         </div>
-        
-
       </figure>
     </div>
-    
+
     <!-- Search Form -->
     <form id="searchForm" class="flex space-x-2">
       <input 
@@ -74,12 +62,143 @@
         Search
       </button>
     </form>
+    
+    <div id="aiResponse" class="space-y-4">
+      <!-- AI response will appear here as rendered Markdown -->
+    </div>
+
     <div id="results" class="space-y-4">
       <!-- Search results will appear here -->
     </div>
+
   </div>
-  
+
+  <!-- Load config and app logic -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
   <script src="config.js"></script>
-  <script src="app.js"></script>
+  <!-- Load Marked for Markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script>
+    document.getElementById('searchForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      const queryInput = document.getElementById('searchInput');
+      const originalQuery = queryInput.value.trim();
+
+      if (!originalQuery) {
+        showMessage('Please enter a search term.', 'text-gray-600', 'results');
+        return;
+      }
+
+      showMessage(`Searching for "${originalQuery}" (excluding Amazon)...`, 'text-gray-600', 'results');
+
+      try {
+        const results = await performSearch(originalQuery);
+        renderResults(results, originalQuery);
+
+        // After we have the results, call OpenAI to process them
+        await performOpenAICall(originalQuery, results);
+      } catch (error) {
+        console.error('Fetch Error:', error);
+        showMessage('Error fetching results. Try again later.', 'text-red-600', 'results');
+      }
+    });
+
+    async function performSearch(query) {
+      const { apiKey, cseId } = window.CONFIG;
+      const finalQuery = `${query} -site:amazon.com`;
+
+      const url = `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(finalQuery)}&key=${apiKey}&cx=${cseId}`;
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(`API Error: ${data.error.message}`);
+      }
+
+      return data.items || [];
+    }
+
+    function renderResults(results, query) {
+      const resultsContainer = document.getElementById('results');
+      if (!results.length) {
+        showMessage(`No results found for "${query}".`, 'text-gray-600', 'results');
+        return;
+      }
+
+      const html = results.map(item => `
+        <div class="p-4 border-b border-gray-200">
+          <a href="${item.link}" target="_blank" class="text-blue-600 font-medium hover:underline">${item.title}</a>
+          <p class="text-gray-600 mt-1">${item.snippet || ''}</p>
+        </div>
+      `).join('');
+
+      resultsContainer.innerHTML = html;
+    }
+
+    function showMessage(message, classes = 'text-gray-600', containerId = 'results') {
+      const container = document.getElementById(containerId);
+      container.innerHTML = `<p class="${classes}">${message}</p>`;
+    }
+
+    async function loadPrompts() {
+      const response = await fetch('prompts.json');
+      if (!response.ok) {
+        throw new Error('Failed to load prompts');
+      }
+      return response.json();
+    }
+
+    async function performOpenAICall(query, results) {
+      const prompts = await loadPrompts();
+      const contextJson = JSON.stringify(results.slice(0, 5), null, 2);
+
+      const messages = [
+        { role: "system", content: prompts.system },
+        { role: "user", content: `${prompts.user}\n\nQuery: "${query}"\n\nTop Search Results:\n${contextJson}` }
+      ];
+
+      showMessage('Processing your request with AI...', 'text-gray-600', 'aiResponse');
+
+      try {
+        const { openAIApiKey } = window.CONFIG;
+        const openAIUrl = "https://api.openai.com/v1/chat/completions";
+
+        const response = await fetch(openAIUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${openAIApiKey}`
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages: messages
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`OpenAI API Error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const aiResponseText = data.choices && data.choices.length > 0 
+          ? data.choices[0].message.content 
+          : "No response from AI.";
+
+        // Convert Markdown to HTML
+        marked.setOptions({
+            breaks: true,
+            gfm: true // optional, but often useful
+        });
+        const renderedHtml = marked.parse(aiResponseText);
+        const aiContainer = document.getElementById('aiResponse');
+        aiContainer.innerHTML = `<div class="prose max-w-none">${renderedHtml}</div>`;
+
+      } catch (error) {
+        console.error('OpenAI Error:', error);
+        showMessage('Error processing AI request. Try again later.', 'text-red-600', 'aiResponse');
+      }
+    }
+  </script>
 </body>
 </html>
